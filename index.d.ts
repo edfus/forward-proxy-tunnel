@@ -9,6 +9,14 @@ export declare class ProxyTunnel {
     proxy: URL | string, proxyHeaders?: object, defaultHeaders?: object
   );
 
+  /**
+   * shut down the proxy tunnel.
+   * 
+   * as this module is using agents with keepAlive enabled,
+   * sockets might stay open for quite a long time before 
+   * the server terminates. It is best to explicitly shut 
+   * down the proxy tunnel when it is no longer needed.
+   */
   destroy(): void;
   fetch(url: string | URL, options: RequestOptions): Promise<Response>;
 

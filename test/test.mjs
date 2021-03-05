@@ -19,9 +19,9 @@ describe("proxy", () => {
         .then(response => strictEqual(response.statusCode, 204)),
       proxyTunnel.fetch("https://pbs.twimg.com/media/")
         .then(response => strictEqual(response.statusCode, 404)),
-      proxyTunnel.fetch("https://nodejs.org")
+      proxyTunnel.fetch("https://nodejs.org", { method: "HEAD" })
         .then(response => strictEqual(response.statusCode, 302))
-    ])
+    ]);
   }).timeout(5000);
 
   it("http", () => {
