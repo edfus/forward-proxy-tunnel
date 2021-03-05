@@ -1,0 +1,26 @@
+{
+  "name": "forward-proxy-tunnel",
+  "version": "1.0.0",
+  "description": "A simplified http[s]OverHttp proxy tunnel with connection reuse",
+  "scripts": {
+    "test": "set NODE_DEBUG=proxy&& mocha"
+  },
+  "type": "module",
+  "author": "edfus",
+  "main": "index.mjs",
+  "module": "index.mjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "import": "./build/index.mjs"
+      },
+      "default": "./build/index.mjs"
+    }
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@types/mocha": "^8.2.1",
+    "why-is-node-running": "^2.2.0"
+  }
+}
