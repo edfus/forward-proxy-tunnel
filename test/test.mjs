@@ -6,7 +6,7 @@ import log from "why-is-node-running";
 import { strictEqual } from "assert";
 import { request as request_https } from "https";
 import { request as request_http } from "http";
-import { createProxyServer, createHTTPServer, createHTTPSServer, getServerAddress } from "./helpers/index.mjs";
+import { createProxyServer, createHTTPServer, createHTTPSServer, getServerAddress } from "./helpers/helpers.mjs";
 
 const { proxyServer, auth } = createProxyServer();
 const proxyAddress = getServerAddress(proxyServer);
@@ -21,6 +21,9 @@ proxyServer
         { 
           proxyHeaders: {
             "Proxy-Authorization": `Basic ${auth}`
+          },
+          agentOptions: {
+            maxSockets: 3
           }
         }
       );
@@ -43,10 +46,15 @@ proxyServer
             httpServer
               .once("listening", () => {
                 Promise.all([
-                  ...new Array(10).fill(void 0)
+                  ...new Array(30).fill(void 0)
                     .map(
-                      _ => proxyTunnel.fetch(address)
-                      .then(res => strictEqual(res.statusCode, 200))
+                      _ => (
+                        proxyTunnel.fetch(address)
+                          .then(res => {
+                            strictEqual(res.statusCode, 200);
+                            res.resume();
+                          })
+                      )
                     )
                   ,
 
@@ -70,7 +78,7 @@ proxyServer
             return reject(err);
           }
         });
-      }).timeout(50000);
+      });
 
 
       it("https", async () => {
@@ -83,10 +91,23 @@ proxyServer
             httpsServer
               .once("listening", () => {
                 Promise.all([
-                  ...new Array(10).fill(void 0)
+                  ...new Array(30).fill(void 0)
                     .map(
-                      _ => proxyTunnel.fetch(address)
-                      .then(res => strictEqual(res.statusCode, 403))
+                      _ => new Promise(resolve => 
+                        setTimeout(resolve, Math.random() * 150)
+                      )
+                    )
+                    .map(
+                      async timeout => {
+                        await timeout;
+                        return (
+                          proxyTunnel.fetch(address)
+                            .then(res => {
+                              strictEqual(res.statusCode, 403);
+                              res.resume();
+                            })
+                        );
+                      }
                     ),
 
                   new Promise((_resolve, _reject) => {
@@ -110,8 +131,41 @@ proxyServer
             return reject(err);
           } 
         });
-      }).timeout(5000);
+      });
 
+      xit("external sites", async () => {
+        const proxy = new ProxyTunnel(
+          "http://127.0.0.1:7890"
+        );
+        
+        await Promise.all([
+          proxy.fetch("https://www.google.com/generate_204")
+            .then(res => {
+              strictEqual(res.statusCode, 204);
+              res.resume();
+            }),
+          proxy.fetch("http://www.google.com/generate_204")
+            .then(res => {
+              strictEqual(res.statusCode, 204);
+              res.resume();
+            }),
+          proxy.fetch("https://nodejs.org")
+            .then(res => {
+              strictEqual(res.statusCode, 302);
+              res.resume();
+            }),
+          proxy.fetch("https://developer.mozilla.org")
+            .then(res => {
+              strictEqual(res.statusCode, 302);
+              res.resume();
+            }),
+          proxy.fetch("https://github.com/", { method: "HEAD" })
+            .then(res => {
+              strictEqual(res.statusCode, 200);
+              res.resume();
+            })
+        ])
+      }).timeout(5000);
     });
   })
   ;

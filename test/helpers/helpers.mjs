@@ -10,16 +10,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxyAuth = Buffer.from("test:test").toString("base64");
 const serverAuth = Buffer.from("test:test-serverauth").toString("base64");
 
-const redirSocket = (clientSocket, serverSocket, { keepAlive = false } = {}) => {
-  clientSocket.pipe(serverSocket).pipe(clientSocket);
-  clientSocket.once("error", err => {
-    serverSocket.destroy();
-    throw err;
-  });
-  serverSocket.once("error", err => {
-    clientSocket.destroy();
-    throw err;
-  });
+const pipe = (...streams) => {
+  const set = new Set(streams);
+  const errorHandler = err => {
+    set.forEach(s => s.destroy());
+    set.clear();
+    // throw err;
+  }
+  set.forEach(s => s.once("error", errorHandler));
+  for (let i = 0; i < streams.length - 1; i++) {
+    streams[i].pipe(streams[i + 1])
+  }
+  streams = null;
 }
 
 const verifyAuth = (request, socket) => {
@@ -54,23 +56,32 @@ function createProxyServer (port) {
         return ;
       try {
         const tmpErrorHandler = err => {
+          // for testing retry
+          // res.destroy();
           res.writeHead(500, err.message).end();
           throw err;
         };
 
         const serverReq = request(req.url, {
+          method: req.method,
           headers: {
             "Authorization": `Basic ${serverAuth}`,
             ...req.headers,
           }
         })
-          .once("socket", socket => {
+          .once("response", serverRes => {
             serverReq.removeListener("error", tmpErrorHandler);
-            redirSocket(req.socket, socket);
+            res.writeHead(
+              serverRes.statusCode,
+              serverRes.statusMessage,
+              serverRes.headers
+            );
+            pipe(serverRes, res);
           })
           .once("error", tmpErrorHandler);
+        ;
 
-          serverReq.end();
+        pipe(req, serverReq);
       } catch (err) {
         res.writeHead(400).end("Bad Request");
         throw err;
@@ -99,7 +110,7 @@ function createProxyServer (port) {
 
             serverSocket.removeListener("error", tmpErrorHandler);
 
-            redirSocket(socket, serverSocket);
+            pipe(socket, serverSocket, socket);
           })
             .once("error", tmpErrorHandler)
           ; 
@@ -122,6 +133,8 @@ const auth = req => {
 };
 
 function createHTTPServer (port) {
+  // const startTime = Date.now();
+  // let dropped = 0;
   return createServer((req, res) => {
     if(auth(req)) {
       return res.writeHead(200).end("okay");
@@ -130,6 +143,13 @@ function createHTTPServer (port) {
     }
   })
     .unref()
+    .on("connection", socket => {
+      // for testing retry
+      // not having any idea about how to detect socket reuse
+      // in server side... So here comes the hacky way.
+      // if(dropped < 2 && Date.now() - startTime > 100)
+      //   ++dropped && socket.destroy();
+    })
     .listen(port || 0)
   ;
 }
