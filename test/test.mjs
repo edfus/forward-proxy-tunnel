@@ -1,33 +1,117 @@
-import { strictEqual } from "assert";
+// process.env['NODE_DEBUG'] = "proxy";
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
+
 import ProxyTunnel from "../index.mjs";
 import log from "why-is-node-running";
+import { strictEqual } from "assert";
+import { request as request_https } from "https";
+import { request as request_http } from "http";
+import { createProxyServer, createHTTPServer, createHTTPSServer, getServerAddress } from "./helpers/index.mjs";
 
-describe("proxy", () => {
-  const proxyTunnel = new ProxyTunnel("http://127.0.0.1:7890");
+const { proxyServer, auth } = createProxyServer();
+const proxyAddress = getServerAddress(proxyServer);
 
-  after(() => {
-    proxyTunnel.destroy();
-    setTimeout(log, 3000).unref();
-    process.stdin.on("data", data => 
-      data.toString().startsWith("log") && log()
-    ).unref();
-  });
+console.info(`    proxy server is running at ${proxyAddress}`);
 
-  it("https", async () => {
-    await Promise.all([
-      proxyTunnel.fetch("https://www.google.com/generate_204")
-        .then(response => strictEqual(response.statusCode, 204)),
-      proxyTunnel.fetch("https://pbs.twimg.com/media/")
-        .then(response => strictEqual(response.statusCode, 404)),
-      proxyTunnel.fetch("https://nodejs.org", { method: "HEAD" })
-        .then(response => strictEqual(response.statusCode, 302))
-    ]);
-  }).timeout(5000);
+proxyServer
+  .once("listening", () => {
+    describe("proxy", () => {
+      const proxyTunnel = new ProxyTunnel(
+        proxyAddress,
+        { 
+          proxyHeaders: {
+            "Proxy-Authorization": `Basic ${auth}`
+          }
+        }
+      );
 
-  it("http", () => {
-    return Promise.all([
-      proxyTunnel.fetch("http://www.google.com/generate_204")
-        .then(response => strictEqual(response.statusCode, 204))
-    ])
-  }).timeout(5000);
-});
+      after(() => {
+        proxyTunnel.destroy();
+        setTimeout(log, 3000).unref();
+        process.stdin.on("data", data =>
+          data.toString().startsWith("log") && log()
+        ).unref();
+      });
+
+      it("http", async () => {
+        return new Promise((resolve, reject) => {
+          try {
+            const httpServer = createHTTPServer();
+            const address = getServerAddress(httpServer);
+            console.info(`    http server is running at ${address}`);
+
+            httpServer
+              .once("listening", () => {
+                Promise.all([
+                  ...new Array(10).fill(void 0)
+                    .map(
+                      _ => proxyTunnel.fetch(address)
+                      .then(res => strictEqual(res.statusCode, 200))
+                    )
+                  ,
+
+                  new Promise((_resolve, _reject) => {
+                    request_http(address)
+                      .once("response", res => {
+                        try {
+                          _resolve(strictEqual(res.statusCode, 403));
+                        } catch (err) {
+                          _reject(err);
+                        }
+                      })
+                      .once("error", _reject)
+                    .end()
+                  })
+                ])
+                  .then(resolve, reject);
+              })
+            ;
+          } catch (err) {
+            return reject(err);
+          }
+        });
+      }).timeout(50000);
+
+
+      it("https", async () => {
+        return new Promise(async (resolve, reject) => {
+          try {
+            const httpsServer = createHTTPSServer();
+            const address = getServerAddress(httpsServer);
+            console.info(`    https server is running at ${address}`);
+
+            httpsServer
+              .once("listening", () => {
+                Promise.all([
+                  ...new Array(10).fill(void 0)
+                    .map(
+                      _ => proxyTunnel.fetch(address)
+                      .then(res => strictEqual(res.statusCode, 403))
+                    ),
+
+                  new Promise((_resolve, _reject) => {
+                    request_https(address)
+                      .once("response", res => {
+                        try {
+                          _resolve(strictEqual(res.statusCode, 403));
+                        } catch (err) {
+                          _reject(err);
+                        }
+                      })
+                      .once("error", _reject)
+                      .end()
+                    ;
+                  })
+                ])
+                  .then(resolve, reject);
+              })
+            ;
+          } catch (err) {
+            return reject(err);
+          } 
+        });
+      }).timeout(5000);
+
+    });
+  })
+  ;
