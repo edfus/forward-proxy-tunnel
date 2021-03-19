@@ -20,7 +20,11 @@ const debug = {
 };
 
 class ProxyTunnel {
-  constructor(proxy, proxyHeaders = {}, defaultHeaders = {}) {
+  constructor(proxy, {
+    proxyHeaders = {},
+    defaultHeaders = {},
+    keepAlive = true
+  } = {}) {
     this.proxy = proxy instanceof URL ? proxy : new URL(proxy);
     this.proxyHeaders = proxyHeaders;
     this.defaultHeaders = {
@@ -30,23 +34,26 @@ class ProxyTunnel {
     };
 
     this.httpAgent = new Agent({
-      keepAlive: true
+      keepAlive
     });
     this.httpsAgent = new AgentHTTPS({
-      keepAlive: true
+      keepAlive
     });
     this.httpsAgent.createConnection = this.createSecureConnection.bind(this);
   }
 
   createSecureConnection({ host: hostname, port }, cb) {
+    const host = constructHost({ hostname, port });
+
     http_connect(
       this.proxy,
       {
         method: "CONNECT",
         agent: this.httpAgent,
-        path: `${hostname}:${port}`,
+        path: host,
+        setHost: false,
         headers: {
-          "Host": `${hostname}:${port}`,
+          "Host": host,
           ...this.proxyHeaders
         }
       }
@@ -73,8 +80,38 @@ class ProxyTunnel {
     this.httpAgent.destroy();
   }
 
-  async fetch(url, options = {}) {
-    const uriObject = url instanceof URL ? url : new URL(url);
+  request(input, options = {}, cb) {
+    options = Object.assign({}, options); // shallow copy
+    let uriObject;
+
+    if (typeof input === 'string') {
+      uriObject = new URL(input);
+    } else if (input instanceof URL) {
+      uriObject = input;
+    } else {
+      cb = options;
+      options = input;
+      const protocol = options.protocol || "http:";
+      const host = options.hostname || options.host;
+      const port = options.port || options.defaultPort || protocol === "https:" ? "443" : "80";
+      const path = options.path || "/";
+
+      uriObject = new URL(`${protocol}//${host}:${port}${path}`);
+      delete options.protocol;
+      delete options.hostname;
+      delete options.port;
+      delete options.defaultPort;
+      delete options.path;
+    }
+
+    input = null;
+
+    // for http.request.options.path
+    if(options.path) {
+      uriObject.pathname = options.path;
+      delete options.path;
+    }
+
     const headers = options.headers || this.defaultHeaders;
     delete options.headers;
 
@@ -84,12 +121,12 @@ class ProxyTunnel {
             uriObject,
             {
               agent: this.httpsAgent,
+              ...options,
               headers: {
                 // "Persist": uriObject.hostname,
                 // "Connection": "keep-alive, persist",
                 ...headers
-              },
-              ...options
+              }
             }
           )
         : request_http(
@@ -97,84 +134,97 @@ class ProxyTunnel {
             {
               path: uriObject.toString(),
               agent: this.httpAgent,
+              setHost: false,
+              ...options,
               headers: {
                 Host: constructHost(uriObject),
                 ...this.proxyHeaders,
                 ...headers
-              },
-              setHost: false,
-              ...options
+              }
             }
           )
     );
 
-    return new Promise((resolve, reject) => {
+    if(typeof cb === "function")
+      request.once("response", cb)
+
+    request
+      .once("error", err => {
+        if (request.reusedSocket && err.code === 'ECONNRESET') {
+          request.removeListener("response", resolve);
+          this.fetch.apply(this, arguments).then(resolve, reject);
+        } else {
+          return request.emit("error", err); //NOTE 
+        }
+      })
+    ;
+
+    /**
+     * DEBUG
+     */
+    if (debug.enable) {
+      const protocol = request.protocol.replace(/(?<=https?):/, "");
+      const id = debug.id[protocol];
+      const socketName = ["socket", "tlsSocket"][Number(protocol === "https")];
+      
+      const id_req = ++id.req;
       request
-        .once("response", resolve)
-        .once("error", err => {
-          if (request.reusedSocket && err.code === 'ECONNRESET') {
-            request.removeListener("response", resolve);
-            this.fetch.apply(this, arguments).then(resolve, reject);
+        .once("socket", socket => {
+          if (debug.socketsMap.has(socket)) {
+            console.info(
+              "\x1b[36m%s\x1b[0m", // cyan
+              `✓  ${protocol} request ${id_req} reusing ${socketName} ${debug.socketsMap.get(socket)}`
+            );
           } else {
-            return reject(err);
+            const id_tcp = ++id.tcp;
+
+            debug.socketsMap.set(socket, id_tcp);
+            console.info(`-  ${protocol} request ${id_req} using new ${socketName} ${id_tcp}`);
+            
+            socket.once("close", errored => {
+              const log = [];
+              if(request.reusedSocket) {
+                log.push("\x1b[33m%s\x1b[0m"); // yellow
+                log.push("Reused");
+              } else {
+                log.push("✕  ");
+              }
+
+              log.push(`${socketName} ${id_tcp} for ${protocol} request ${id_req} closed`);
+
+              if(errored) {
+                log.push("\x1b[31mWITH ERROR\x1b[0m"); // red
+              }
+              console.info.apply(void 0, log);
+            });
           }
         })
-        .end()
-      ;
+        .once("close", () => console.info(`☓  ${protocol} request ${id_req} closed connection`));
+    }
+    /**
+     * DEBUG END
+     */
 
-      /**
-       * DEBUG
-       */
-      if (debug.enable) {
-        const protocol = request.protocol.replace(/(?<=https?):/, "");
-        const id = debug.id[protocol];
-        const socketName = ["socket", "tlsSocket"][Number(protocol === "https")];
-        
-        const id_req = ++id.req;
-        request
-          .once("socket", socket => {
-            if (debug.socketsMap.has(socket)) {
-              console.info(
-                "\x1b[36m%s\x1b[0m", // cyan
-                `✓  ${protocol} request ${id_req} reusing ${socketName} ${debug.socketsMap.get(socket)}`
-              );
-            } else {
-              const id_tcp = ++id.tcp;
+    return request;
+  }
 
-              debug.socketsMap.set(socket, id_tcp);
-              console.info(`-  ${protocol} request ${id_req} using new ${socketName} ${id_tcp}`);
-              
-              socket.once("close", errored => {
-                const log = [];
-                if(request.reusedSocket) {
-                  log.push("\x1b[33m%s\x1b[0m"); // yellow
-                  log.push("Reused");
-                } else {
-                  log.push("✕  ");
-                }
-
-                log.push(`${socketName} ${id_tcp} for ${protocol} request ${id_req} closed`);
-
-                if(errored) {
-                  log.push("\x1b[31mWITH ERROR\x1b[0m"); // red
-                }
-                console.info.apply(void 0, log);
-              });
-            }
-          })
-          .once("close", () => console.info(`☓  ${protocol} request ${id_req} closed connection`));
-      }
-      /**
-       * DEBUG END
-       */
-    });
+  async fetch (...argv) {
+    return (
+      new Promise((resolve, reject) => {
+        this.request.apply(this, argv)
+          .once("response", resolve)
+          .once("error", reject)
+          .end()
+        ;
+      })
+    );
   }
 }
 
 export default ProxyTunnel;
 
 function connectErrored(err) {
-  return `connecting to proxy failed with ${err.stack || err}`;
+  return new Error(`connecting to proxy failed with ${err.stack || err}`);
 }
 
 function constructHost(uriObject) {
@@ -182,11 +232,14 @@ function constructHost(uriObject) {
 
   if (!port) {
     if (uriObject.protocol === "https:") {
-      port = "443"
+      port = 443
     } else {
-      port = "80"
+      port = 80
     }
   }
 
-  return `${uriObject.hostname}:${port}`;
+  return uriObject.hostname.includes(":")
+          ? `[${uriObject.hostname}]:${port}`
+          : `${uriObject.hostname}:${port}`
+  ;
 }
