@@ -23,7 +23,9 @@ class ProxyTunnel {
   constructor(proxy, {
     proxyHeaders = {},
     defaultHeaders = {},
-    keepAlive = true
+    agentOptions = {
+      keepAlive: true
+    }
   } = {}) {
     this.proxy = proxy instanceof URL ? proxy : new URL(proxy);
     this.proxyHeaders = proxyHeaders;
@@ -33,12 +35,8 @@ class ProxyTunnel {
       ...defaultHeaders
     };
 
-    this.httpAgent = new Agent({
-      keepAlive
-    });
-    this.httpsAgent = new AgentHTTPS({
-      keepAlive
-    });
+    this.httpAgent = new Agent(agentOptions);
+    this.httpsAgent = new AgentHTTPS(agentOptions);
     this.httpsAgent.createConnection = this.createSecureConnection.bind(this);
   }
 
@@ -148,17 +146,6 @@ class ProxyTunnel {
     if(typeof cb === "function")
       request.once("response", cb)
 
-    request
-      .once("error", err => {
-        if (request.reusedSocket && err.code === 'ECONNRESET') {
-          request.removeListener("response", resolve);
-          this.fetch.apply(this, arguments).then(resolve, reject);
-        } else {
-          return request.emit("error", err); //NOTE 
-        }
-      })
-    ;
-
     /**
      * DEBUG
      */
@@ -211,11 +198,19 @@ class ProxyTunnel {
   async fetch (...argv) {
     return (
       new Promise((resolve, reject) => {
-        this.request.apply(this, argv)
-          .once("response", resolve)
-          .once("error", reject)
-          .end()
-        ;
+        const req = (
+          this.request.apply(this, argv)
+            .once("response", resolve)
+            .once("error", err => {
+              if (req.reusedSocket && err.code === 'ECONNRESET') {
+                req.removeListener("response", resolve);
+                this.fetch.apply(this, arguments).then(resolve, reject);
+              } else {
+                return reject(err);
+              }
+            })
+        );
+        req.end();
       })
     );
   }

@@ -5,8 +5,15 @@ import {
   ServerResponse,
   ClientRequest
 } from "http";
-import { Agent as HTTPS_Agent, RequestOptions } from "https";
+import { Agent as HTTPS_Agent, RequestOptions, AgentOptions } from "https";
 import { TLSSocket } from "tls";
+
+interface ProxyAgentOptions extends AgentOptions {
+  /**
+   * default: true
+   */
+  keepAlive?: boolean
+}
 
 export declare class ProxyTunnel {
   constructor(
@@ -18,10 +25,7 @@ export declare class ProxyTunnel {
        * "Accept": "*\/*",
        */
       defaultHeaders?: object,
-      /**
-       * default: true
-       */
-      keepAlive?: boolean
+      agentOptions: ProxyAgentOptions
     }
   );
 
@@ -44,13 +48,16 @@ export declare class ProxyTunnel {
    * to raw node request.
    * 
    * As a result, overriding this.httpsAgent or specifying options.agent
-   * for https request may result in not using the proxy reaching to the
-   * endpoint.
+   * / options.createConnection for https request may result in not using
+   * the proxy reaching to the endpoint.
    */
   request(url: string | URL, options?: RequestOptions, cb?: ((res: ServerResponse) => void)): ClientRequest;
   request(options: RequestOptions, cb?: ((res: ServerResponse) => void)): ClientRequest;
   /**
-   * promisified request method for http methods being fine with empty body request
+   * promisified request method for http methods being fine with empty body
+   * request.
+   * 
+   * will do automatic error retry for reused socket. (keepAlive)
    */
   async fetch(url: string | URL, options?: RequestOptions): ServerResponse
   async fetch(options: RequestOptions): ServerResponse
