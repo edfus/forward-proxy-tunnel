@@ -59,8 +59,8 @@ export declare class ProxyTunnel {
    * 
    * will do automatic error retry for reused socket. (keepAlive)
    */
-  async fetch(url: string | URL, options?: RequestOptions): ServerResponse
-  async fetch(options: RequestOptions): ServerResponse
+  fetch(url: string | URL, options?: RequestOptions): Promise<ServerResponse>
+  fetch(options: RequestOptions): Promise<ServerResponse>
   httpAgent: HTTP_Agent;
   httpsAgent: HTTPS_Agent;
   proxy: URL;

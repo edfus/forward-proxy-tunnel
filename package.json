@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "description": "A simplified http[s]OverHttp proxy tunnel with connection reuse",
   "scripts": {
-    "test": "set NODE_DEBUG=proxy&& mocha"
+    "test": "mocha"
   },
   "type": "module",
   "author": "edfus",
