@@ -10,6 +10,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxyAuth = Buffer.from("test:test").toString("base64");
 const serverAuth = Buffer.from("test:test-serverauth").toString("base64");
 
+const redirSocket = (clientSocket, serverSocket, { keepAlive = false } = {}) => {
+  clientSocket.pipe(serverSocket).pipe(clientSocket);
+  clientSocket.once("error", err => {
+    serverSocket.destroy();
+    throw err;
+  });
+  serverSocket.once("error", err => {
+    clientSocket.destroy();
+    throw err;
+  });
+}
+
 const verifyAuth = (request, socket) => {
   const auth = request.headers['proxy-authorization'];
   if (!auth || auth !== `Basic ${proxyAuth}`) {
@@ -54,15 +66,7 @@ function createProxyServer (port) {
         })
           .once("socket", socket => {
             serverReq.removeListener("error", tmpErrorHandler);
-            req.socket.pipe(socket).pipe(req.socket);
-            req.socket.once("error", err => {
-              socket.destroy();
-              throw err;
-            });
-            socket.once("error", err => {
-              req.socket.destroy();
-              throw err;
-            });
+            redirSocket(req.socket, socket);
           })
           .once("error", tmpErrorHandler);
 
@@ -95,15 +99,7 @@ function createProxyServer (port) {
 
             serverSocket.removeListener("error", tmpErrorHandler);
 
-            socket.pipe(serverSocket).pipe(socket);
-            serverSocket.once("error", err => {
-              socket.destroy();
-              throw err;
-            });
-            socket.once("error", err => {
-              serverSocket.destroy();
-              throw err;
-            });
+            redirSocket(socket, serverSocket);
           })
             .once("error", tmpErrorHandler)
           ; 
