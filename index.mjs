@@ -78,15 +78,18 @@ class ProxyTunnel {
     this.httpAgent.destroy();
   }
 
-  request(input, options = {}, cb) {
+  request(input, options, cb) {
     options = Object.assign({}, options); // shallow copy
     let uriObject;
+
+    if(!input)
+      throw new TypeError(`forward-proxy-tunnel: unexpected falsy input ${input}`);
 
     if (typeof input === 'string') {
       uriObject = new URL(input);
     } else if (input instanceof URL) {
       uriObject = input;
-    } else {
+    } else if(typeof input === "object") {
       cb = options;
       options = input;
       const protocol = options.protocol || "http:";
@@ -100,6 +103,8 @@ class ProxyTunnel {
       delete options.port;
       delete options.defaultPort;
       delete options.path;
+    } else {
+      throw new TypeError(`forward-proxy-tunnel: unexpected input ${input}`);
     }
 
     input = null;
@@ -143,8 +148,12 @@ class ProxyTunnel {
           )
     );
 
-    if(typeof cb === "function")
-      request.once("response", cb)
+    if(cb) {
+      if(typeof cb === "function")
+        request.once("response", cb)
+      else
+        throw new TypeError(`forward-proxy-tunnel: expected function, but ${typeof cb} is passed as the callback.`);
+    }
 
     /**
      * DEBUG
