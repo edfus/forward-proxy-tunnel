@@ -101,8 +101,8 @@ function createProxyServer (port) {
             throw err;
           }
 
-          if(/^[.+?]$/.test(hostname))
-            hostname = hostname.replace(/^[(.+?)]$/, (_, hostname) => hostname);
+          if(/^\[.+?\]$/.test(hostname))
+            hostname = hostname.replace(/^\[(.+?)\]$/, (_, hostname) => hostname);
 
           const serverSocket = connect(port, hostname, () => {
             socket.write([
