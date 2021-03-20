@@ -15,7 +15,7 @@ interface ProxyAgentOptions extends AgentOptions {
   keepAlive?: boolean
 }
 
-export declare class ProxyTunnel {
+declare class ProxyTunnel {
   constructor(
     proxy: URL | string, options: {
       proxyHeaders?: object,
@@ -72,3 +72,5 @@ export declare class ProxyTunnel {
     callback: ((err: Error | null, socket: TLSSocket) => void)
   ): void;
 }
+
+export default ProxyTunnel;

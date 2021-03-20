@@ -94,12 +94,15 @@ function createProxyServer (port) {
           return ;
 
         try {
-          const { 0: hostname, 1: port = 80 } = request.url.split(/:(?=\d*$)/);
+          let { 0: hostname, 1: port = 80 } = request.url.split(/:(?=\d*$)/);
 
           const tmpErrorHandler = err => {
             socket.end(`HTTP/1.1 500 ${err.message}\r\n\r\n\r\n`);
             throw err;
           }
+
+          if(/^[.+?]$/.test(hostname))
+            hostname = hostname.replace(/^[(.+?)]$/, (_, hostname) => hostname);
 
           const serverSocket = connect(port, hostname, () => {
             socket.write([
