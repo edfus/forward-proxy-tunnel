@@ -28,6 +28,41 @@ proxy.fetch("https://localhost:8080")
       .catch(console.error);
 ```
 
+```js
+import ProxyTunnel from "forward-proxy-tunnel";
+
+class HTTP {
+  constructor (proxy) {
+    if(proxy) {
+      this.proxy = new ProxyTunnel(proxy);
+    }
+  }
+
+  request (_input, _options, _cb) {
+    const { uriObject, options, cb } = ProxyTunnel.prototype.parseRequestParams(_input, _options, _cb);
+
+    return (
+      uriObject.protocol === "https:"
+        ? request_https(uriObject, options, cb)
+        : request_http(uriObject, options, cb)
+    );
+  }
+
+  async fetch () {
+    return ProxyTunnel.prototype.fetch.apply(this, arguments);
+  }
+}
+
+const useProxy = true;
+const http  = new HTTP("http://localhost:8888");
+const fetch = useProxy ? http.proxy.fetch.bind(http.proxy) : http.fetch.bind(http);
+const request = useProxy ? http.proxy.request.bind(http.proxy) : http.request.bind(http);
+
+if(useProxy) {
+  process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
+}
+```
+
 ## API
 
 see <https://github.com/edfus/forward-proxy-tunnel/blob/master/index.d.ts>

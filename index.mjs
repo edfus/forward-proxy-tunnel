@@ -78,9 +78,8 @@ class ProxyTunnel {
     this.httpAgent.destroy();
   }
 
-  request(input, options, cb) {
+  parseRequestParams (input, options, cb) {
     let uriObject;
-
     
     if(!input)
       throw new TypeError(`Forward-proxy-tunnel: Unexpected falsy input ${input}`);
@@ -109,7 +108,11 @@ class ProxyTunnel {
       throw new TypeError(`Forward-proxy-tunnel: Unexpected input ${input}`);
     }
 
-    input = null;
+    return { uriObject, options, cb }
+  }
+
+  request(_input, _options, _cb) {
+    const { uriObject, options, cb } = this.parseRequestParams(_input, _options, _cb);
 
     // for http.request.options.path
     if(options.path) {

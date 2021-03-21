@@ -15,6 +15,9 @@ interface ProxyAgentOptions extends AgentOptions {
   keepAlive?: boolean
 }
 
+type ResponseCallback = (res: ServerResponse) => void;
+type ClonedOptions = RequestOptions;
+
 declare class ProxyTunnel {
   constructor(
     proxy: URL | string, options: {
@@ -51,8 +54,8 @@ declare class ProxyTunnel {
    * / options.createConnection for https request may result in not using
    * the proxy reaching to the endpoint.
    */
-  request(url: string | URL, options?: RequestOptions, cb?: ((res: ServerResponse) => void)): ClientRequest;
-  request(options: RequestOptions, cb?: ((res: ServerResponse) => void)): ClientRequest;
+  request(url: string | URL, options?: RequestOptions, cb?: ResponseCallback): ClientRequest;
+  request(options: RequestOptions, cb?: ResponseCallback): ClientRequest;
   /**
    * promisified request method for http methods being fine with empty body
    * request.
@@ -61,6 +64,11 @@ declare class ProxyTunnel {
    */
   fetch(url: string | URL, options?: RequestOptions): Promise<ServerResponse>
   fetch(options: RequestOptions): Promise<ServerResponse>
+
+  parseRequestParams (
+    input: string | URL | RequestOptions, options?: RequestOptions, cb?: ResponseCallback
+  ) : { uriObject: URL, options: ClonedOptions, cb:  ResponseCallback}
+
   httpAgent: HTTP_Agent;
   httpsAgent: HTTPS_Agent;
   proxy: URL;
