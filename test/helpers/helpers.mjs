@@ -33,7 +33,7 @@ const verifyAuth = (request, socket) => {
         'Proxy-Authenticate: Basic realm="proxy"',
         "Proxy-Connection: close"
       ].join('\r\n'));
-      socket.end("\r\n\r\n\r\n")
+      socket.end("\r\n\r\n")
     } else {
       const response = socket;
       response.writeHead(407, {
@@ -97,7 +97,7 @@ function createProxyServer (port) {
           let { 0: hostname, 1: port = 80 } = request.url.split(/:(?=\d*$)/);
 
           const tmpErrorHandler = err => {
-            socket.end(`HTTP/1.1 500 ${err.message}\r\n\r\n\r\n`);
+            socket.end(`HTTP/1.1 500 ${err.message}\r\n\r\n`);
             throw err;
           }
 
@@ -109,7 +109,7 @@ function createProxyServer (port) {
               "HTTP/1.1 200 Connection Established",
               "X-Proxy-Agent: node forward-proxy-tunnel test"
             ].join("\r\n"));
-            socket.write("\r\n\r\n\r\n");
+            socket.write("\r\n\r\n");
 
             serverSocket.removeListener("error", tmpErrorHandler);
 
@@ -119,7 +119,7 @@ function createProxyServer (port) {
           ; 
           serverSocket.write(head);
         } catch (err) {
-          socket.end('HTTP/1.1 400 Bad Request\r\n\r\n\r\n');
+          socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
           throw err;
         }
       })
