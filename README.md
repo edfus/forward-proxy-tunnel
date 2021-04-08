@@ -63,6 +63,8 @@ if(useProxy) {
 }
 ```
 
+Check out [this](https://github.com/edfus/networking-dumpster/blob/a2ae44f3c07bc0d5e5b6d53f482589e65fa5854c/web-automation/helpers.js#L123-L222) for more examples.
+
 ## API
 
 see <https://github.com/edfus/forward-proxy-tunnel/blob/master/index.d.ts>
