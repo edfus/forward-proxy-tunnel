@@ -5,6 +5,7 @@ import { readFileSync } from "fs";
 import { connect, Socket } from "net";
 import { createServer as server_https } from "https";
 import { createServer, request, Server as HTTPServer } from "http";
+import { pipeline } from "stream";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxyAuth = Buffer.from("test:test").toString("base64");
@@ -136,10 +137,19 @@ const auth = req => {
 };
 
 function createHTTPServer (port) {
-  // const startTime = Date.now();
-  // let dropped = 0;
   return createServer((req, res) => {
     if(auth(req)) {
+      if(req.headers["content-length"]) {
+        return res.writeHead(202).end("later");
+      }
+      if(req.headers["transfer-encoding"] === "chunked") {
+        res.writeHead(200);
+        return pipeline(
+          req,
+          res,
+          err => { if(err) throw err; }
+        );
+      }
       return res.writeHead(200).end("okay");
     } else {
       return res.writeHead(403).end("authorization field required");
@@ -147,13 +157,12 @@ function createHTTPServer (port) {
   })
     .unref()
     .on("connection", socket => {
-      // for testing retry
-      // not having any idea about how to detect socket reuse
-      // in server side... So here comes the hacky way.
-      // if(dropped < 2 && Date.now() - startTime > 100)
-      //   ++dropped && socket.destroy();
+      /**
+       * not having any idea about how to stably detect sockets reuse
+       * and drop them accordingly in server side... 
+       */
     })
-    .listen(port || 0)
+    .listen(port, "localhost")
   ;
 }
 
@@ -173,13 +182,20 @@ function createHTTPSServer(port) {
       }
     }
   ) .unref()
-    .listen(port || 0)
+    .listen(port, "localhost")
 }
 
 function getServerAddress(server) {
   const protocol = server instanceof HTTPServer ? "http:" : "https:";
 
   const address = server.address();
+
+  // hacky
+  if(protocol === "https:" && /::|127\.0\.0\.1/.test(address.address)) {
+    address.family = "IPv4";
+    address.address = "localhost";
+  }
+
   return (
     address.family === "IPv6"
     ? `${protocol}//[${address.address}]:${address.port}`
