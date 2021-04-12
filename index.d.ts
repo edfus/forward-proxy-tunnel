@@ -7,74 +7,105 @@ import {
 } from "http";
 import { Agent as HTTPS_Agent, RequestOptions, AgentOptions } from "https";
 import { TLSSocket } from "tls";
-
-interface ProxyAgentOptions extends AgentOptions {
-  /**
-   * default: true
-   */
-  keepAlive?: boolean
-}
+import { Readable } from "stream";
 
 type ResponseCallback = (res: ServerResponse) => void;
 type ClonedOptions = RequestOptions;
 
+interface FetchOptions extends RequestOptions {
+  body: Readable | string;
+}
+
+interface ParsedRequestParams {
+  uriObject: URL,
+  options: ClonedOptions,
+  cb:  ResponseCallback
+}
+
+interface Headers {
+  [name: string]: string
+}
+
 declare class ProxyTunnel {
   constructor(
-    proxy: URL | string, options: {
-      proxyHeaders?: object,
+    proxy: URL | string,
+    options: {
+      proxyHeaders?: Headers;
       /**
-       * default:
-       * "User-Agent": `node ${process.version}`,
-       * "Accept": "*\/*",
+       * Default:
+       * 
+       * "User-Agent": `node ${process.version}`
+       * 
+       * "Accept": "*\/\*"
        */
-      defaultHeaders?: object,
-      agentOptions: ProxyAgentOptions
+      defaultHeaders?: Headers;
+      /**
+       * Options for this.http[s]Agent.
+       */
+      agentOptions: AgentOptions;
     }
   );
 
   /**
-   * shut down the proxy tunnel.
+   * Shut down the proxy tunnel.
    * 
-   * as this module is using agents with keepAlive enabled by default,
+   * If keepAlive is specified in agentOptions,
    * sockets might stay open for quite a long time before the server 
    * terminates them. It is best to explicitly shut down the proxy 
    * tunnel when it is no longer needed.
    */
   destroy(): void;
+
   /**
-   * designed to be the same as node vanilla method http[s].request
+   * Designed to be the same as node vanilla method http[s].request
    * except following differences:
    * 
-   * 1. http/https is auto selected by the protocol specified
+   * 1. http/https is auto selected based on the protocol specified.
    * 
-   * 2. this.httpAgent/httpsAgent will be passed as the `agent` option 
+   * 2. this.http[s]Agent will be passed as the `agent` option 
    * to raw node request.
    * 
-   * As a result, overriding this.httpsAgent or specifying options.agent
-   * / options.createConnection for https request may result in not using
-   * the proxy reaching to the endpoint.
+   * As a result, overriding this.httpsAgent or passing options.agent
+   * / options.createConnection to methods may result in a unproxied
+   * request.
    */
   request(url: string | URL, options?: RequestOptions, cb?: ResponseCallback): ClientRequest;
   request(options: RequestOptions, cb?: ResponseCallback): ClientRequest;
   /**
-   * promisified request method for http methods being fine with empty body
-   * request.
+   * Promisified request method. A new option `body` is accepted for
+   * writing data to clientRequest.
    * 
-   * will do automatic error retry for reused socket. (keepAlive)
+   * Will do automatic error retry for reused (keepAlived) socket. 
    */
-  fetch(url: string | URL, options?: RequestOptions): Promise<ServerResponse>
-  fetch(options: RequestOptions): Promise<ServerResponse>
+  fetch(url: string | URL, options?: FetchOptions): Promise<ServerResponse>;
+  fetch(options: FetchOptions): Promise<ServerResponse>;
 
+  /**
+   * Underlying function used by ProxyTunnel#request for normalizing parameters.
+   */
   parseRequestParams (
-    input: string | URL | RequestOptions, options?: RequestOptions, cb?: ResponseCallback
-  ) : { uriObject: URL, options: ClonedOptions, cb:  ResponseCallback}
+    input: string | URL, options?: RequestOptions, cb?: ResponseCallback
+  ) : ParsedRequestParams;
 
+  parseRequestParams (options: RequestOptions, cb?: ResponseCallback): ParsedRequestParams;
+
+  /**
+   * Dedicated http agent for ProxyTunnel instance.
+   */
   httpAgent: HTTP_Agent;
+  /**
+   * Dedicated https agent for ProxyTunnel instance.
+   */
   httpsAgent: HTTPS_Agent;
-  proxy: URL;
-  proxyHeaders: object;
-  defaultHeaders: object;
 
+  proxy: URL;
+  proxyHeaders: Headers;
+  defaultHeaders: Headers;
+
+  /**
+   * The Underlying function installed as this.httpsAgent.createConnection
+   * for proxy https requests.
+   */
   createSecureConnection(
     options: { host: string, port: string },
     callback: ((err: Error | null, socket: TLSSocket) => void)

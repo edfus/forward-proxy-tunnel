@@ -1,6 +1,8 @@
-# forward-proxy-tunnel
+# Forward-proxy-tunnel
 
-*A simplified http\[s\]OverHttp proxy tunnel with connection reuse*
+**Route all your ClientRequests through a http[s]OverHttp proxy tunnel in one line.**
+
+---
 
 ## Features
 
@@ -11,19 +13,21 @@
 
 It's made for circumstances where Node.js needs to be setup to route all ClientRequests through a proxy (e.g. Fiddler debugging) as sadly, Node itself does not support a handy CLI option to achieve this yet.
 
-## Quick start
+## Examples
 
 ```js
 import ProxyTunnel from "forward-proxy-tunnel";
 
 const proxy = new ProxyTunnel("http://127.0.0.1:8888");
 
-proxy.request("https://localhost:8080", { method: "POST" })
+// https://nodejs.org/api/http.html#http_http_request_url_options_callback
+proxy.request("https://localhost:8080", { method: "HEAD" })
      .once("response", res => res.pipe(process.stdout))
      .once("error", console.error)
      .end("data");
 
-proxy.fetch("https://localhost:8080")
+// Promisified alternative for proxy.request.
+proxy.fetch("https://localhost:8080", { method: "POST", body: "Client Hello" })
       .then(res => res.pipe(process.stdout))
       .catch(console.error);
 ```
@@ -67,4 +71,114 @@ Check out [this](https://github.com/edfus/networking-dumpster/blob/a2ae44f3c07bc
 
 ## API
 
-see <https://github.com/edfus/forward-proxy-tunnel/blob/master/index.d.ts>
+```ts
+interface FetchOptions extends RequestOptions {
+  body: Readable | string;
+}
+
+interface ParsedRequestParams {
+  uriObject: URL;
+  options: ClonedOptions;
+  cb:  ResponseCallback;
+}
+
+class ProxyTunnel {
+  constructor(
+    proxy: URL | string,
+    options: {
+      proxyHeaders?: Headers;
+      /**
+       * Default:
+       * 
+       * "User-Agent": `node ${process.version}`
+       * 
+       * "Accept": "*\/\*"
+       */
+      defaultHeaders?: Headers;
+      /**
+       * Options for this.http[s]Agent.
+       */
+      agentOptions: AgentOptions;
+    }
+  );
+
+  /**
+   * Shut down the proxy tunnel.
+   * 
+   * If keepAlive is specified in agentOptions,
+   * sockets might stay open for quite a long time before the server 
+   * terminates them. It is best to explicitly shut down the proxy 
+   * tunnel when it is no longer needed.
+   */
+  destroy(): void;
+
+  /**
+   * Designed to be the same as node vanilla method http[s].request
+   * except following differences:
+   * 
+   * 1. http/https is auto selected based on the protocol specified
+   * 
+   * 2. this.http[s]Agent will be passed as the `agent` option 
+   * to raw node request.
+   * 
+   * As a result, overriding this.httpsAgent or passing options.agent
+   * / options.createConnection to methods may result in a unproxied
+   * request.
+   */
+  request(url: string | URL, options?: RequestOptions, cb?: ResponseCallback): ClientRequest;
+  request(options: RequestOptions, cb?: ResponseCallback): ClientRequest;
+  /**
+   * Promisified request method. A new option `body` is accepted for
+   * writing data to clientRequest.
+   * 
+   * Will do automatic error retry for reused (keepAlived) socket. 
+   */
+  fetch(url: string | URL, options?: FetchOptions): Promise<ServerResponse>;
+  fetch(options: FetchOptions): Promise<ServerResponse>;
+  
+  /**
+   * Underlying function used by ProxyTunnel#request for normalizing parameters.
+   */
+  parseRequestParams (
+    input: string | URL, options?: RequestOptions, cb?: ResponseCallback
+  ) : ParsedRequestParams;
+
+  parseRequestParams (options: RequestOptions, cb?: ResponseCallback): ParsedRequestParams;
+
+  /**
+   * Dedicated http agent for ProxyTunnel instance.
+   */
+  httpAgent: HTTP_Agent;
+  /**
+   * Dedicated https agent for ProxyTunnel instance.
+   */
+  httpsAgent: HTTPS_Agent;
+
+  proxy: URL;
+  proxyHeaders: Headers;
+  defaultHeaders: Headers;
+
+  /**
+   * The Underlying function installed as this.httpsAgent.createConnection
+   * for proxy https requests.
+   */
+  createSecureConnection(
+    options: { host: string, port: string },
+    callback: ((err: Error | null, socket: TLSSocket) => void)
+  ): void;
+}
+```
+
+## Trouble-shooting
+
+- **[DEP0123] DeprecationWarning: Setting the TLS ServerName to an IP address is not permitted by RFC 6066. This will be ignored in a future version.**
+  - You have passed an IP address as the hostname for a HTTPS request in either `url` or `RequestOptions.host[name]`, use `node --trace-warnings ...` to find out more details.
+- 
+
+## Test
+
+With mocha installed globally, just run `npm test`.
+
+External sites' test is disabled for stability reasons, re-enable it if you want.
+
+See <https://github.com/edfus/forward-proxy-tunnel/blob/master/test/test.mjs> for more details.
