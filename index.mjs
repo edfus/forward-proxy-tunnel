@@ -1,11 +1,12 @@
 import { Agent, request as request_http } from "http";
 import { request as request_https, Agent as AgentHTTPS } from "https";
 import { connect as tlsConnect } from "tls";
+import { Readable, pipeline } from "stream";
 
 const http_connect = request_http;
 
 const debug = {
-  enable: process.env.NODE_DEBUG && /\bproxy\b/.test(process.env.NODE_DEBUG),
+  enable: process.env.NODE_DEBUG && /\bproxy\b/i.test(process.env.NODE_DEBUG),
   id: {
     "http": {
       req: 0,
@@ -23,9 +24,7 @@ class ProxyTunnel {
   constructor(proxy, {
     proxyHeaders = {},
     defaultHeaders = {},
-    agentOptions = {
-      keepAlive: true
-    }
+    agentOptions
   } = {}) {
     this.proxy = proxy instanceof URL ? proxy : new URL(proxy);
     this.proxyHeaders = proxyHeaders;
@@ -209,11 +208,16 @@ class ProxyTunnel {
     return request;
   }
 
-  async fetch (...argv) {
+  async fetch (_input, _options) {
+    const { uriObject, options } = this.parseRequestParams(_input, _options);
+
+    const body = options.body;
+    delete options.body;
+
     return (
       new Promise((resolve, reject) => {
         const req = (
-          this.request.apply(this, argv)
+          this.request(uriObject, options)
             .once("response", resolve)
             .once("error", err => {
               if (req.reusedSocket && err.code === 'ECONNRESET') {
@@ -224,7 +228,28 @@ class ProxyTunnel {
               }
             })
         );
-        req.end();
+
+        if(body && req.method === "GET") {
+          if(!req.getHeader("Content-Length") && !req.getHeader("Transfer-Encoding")) {
+            // a malformed request, but let's help with some dirty work
+            console.info(`\x1b[1m\x1b[30mForward-proxy-tunnel: Found a GET request with non-empty body.\x1b[0m`);
+            if(body.length) {
+              req.setHeader("Content-Length", body.length);
+            } else {
+              req.setHeader("Transfer-Encoding", "chunked");
+            }
+          }
+        }
+
+        if (body instanceof Readable) {
+          pipeline(
+            body,
+            req,
+            err => err && reject(err)
+          );
+        } else {
+          req.end(body);
+        }
       })
     );
   }
