@@ -1,7 +1,6 @@
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
 
 import ProxyTunnel from "../index.mjs";
-import log from "why-is-node-running";
 import { strictEqual } from "assert";
 import { request as request_https } from "https";
 import { request as request_http } from "http";
@@ -31,10 +30,11 @@ proxyServer
 
       after(() => {
         proxyTunnel.destroy();
-        setTimeout(log, 3000).unref();
-        process.stdin.on("data", data =>
-          data.toString().startsWith("log") && log()
-        ).unref();
+        // why-is-node-running
+        // setTimeout(log, 3000).unref();
+        // process.stdin.on("data", data =>
+        //   data.toString().startsWith("log") && log()
+        // ).unref();
       });
 
       it("http", async () => {

@@ -1,8 +1,11 @@
 # Forward-proxy-tunnel
 
-**Route all your ClientRequests through a http[s]OverHttp proxy tunnel in one line.**
+A simplified http[s]OverHttp proxy tunnel.
 
----
+[![npm](https://img.shields.io/npm/v/forward-proxy-tunnel?logo=npm)](https://www.npmjs.com/package/forward-proxy-tunnel)
+[![install size](https://packagephobia.com/badge?p=forward-proxy-tunnel)](https://packagephobia.com/result?p=forward-proxy-tunnel)
+[![CI](https://github.com/edfus/forward-proxy-tunnel/actions/workflows/node.js.yml/badge.svg?branch=master)](https://github.com/edfus/forward-proxy-tunnel/actions/workflows/node.js.yml)
+[![Node.js Version](https://raw.githubusercontent.com/edfus/storage/master/node-lts-badge.svg)](https://nodejs.org/en/about/releases/)
 
 ## Features
 
@@ -92,7 +95,7 @@ class ProxyTunnel {
        * 
        * "User-Agent": `node ${process.version}`
        * 
-       * "Accept": "*\/\*"
+       * "Accept": "*/*"
        */
       defaultHeaders?: Headers;
       /**
@@ -173,12 +176,14 @@ class ProxyTunnel {
 
 - **[DEP0123] DeprecationWarning: Setting the TLS ServerName to an IP address is not permitted by RFC 6066. This will be ignored in a future version.**
   - You have passed an IP address as the hostname for a HTTPS request in either `url` or `RequestOptions.host[name]`, use `node --trace-warnings ...` to find out more details.
-- 
+- **Forward-proxy-tunnel: Found a GET request with non-empty body.**
+  - Please set appropriate headers (`Content-Length` or `Transfer-Encoding`) for that GET request. See node issue#3009 [Sending a body with a GET request](https://github.com/nodejs/node/issues/3009)
 
 ## Test
 
 With mocha installed globally, just run `npm test`.
 
-External sites' test is disabled for stability reasons, re-enable it if you want.
-
-See <https://github.com/edfus/forward-proxy-tunnel/blob/master/test/test.mjs> for more details.
+Notes:
+- Tests are not included in npm package, so manual clone is required.
+- Tests depending on external services are disabled for stability reasons, re-enable them if you want.
+- See <https://github.com/edfus/forward-proxy-tunnel/blob/master/test/test.mjs> for more details.
