@@ -1,12 +1,12 @@
 {
   "name": "forward-proxy-tunnel",
-  "version": "1.1.7",
-  "description": "Route ClientRequests through a http[s]OverHttp proxy tunnel.",
+  "version": "1.1.8",
+  "description": "Route ClientRequests through a http[s]OverHttp proxy tunnel in seconds.",
   "scripts": {
     "test": "mocha",
-    "build": "node build/build.mjs"
+    "build": "node build/build.mjs",
+    "prepare": "npm run build"
   },
-  "type": "module",
   "author": "edfus",
   "repository": {
     "type": "git",
@@ -35,6 +35,6 @@
   ],
   "devDependencies": {
     "@types/mocha": "^8.2.1",
-    "update-file-content": "^1.7.4"
+    "update-file-content": "^1.8.4"
   }
 }

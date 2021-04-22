@@ -1,2 +1,5 @@
 .github
 test
+build/build.mjs
+/index.d.ts
+/index.mjs
