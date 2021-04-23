@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { createReadStream, createWriteStream, copyFile, existsSync, mkdir } from "fs";
 import { join, extname, dirname } from "path";
-import { updateFileContent } from "update-file-content";
+import { streamEdit } from "stream-editor";
 import { fileURLToPath } from "url";
 
 const root_directory = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -272,7 +272,7 @@ async function transport (filepath, sourcePath, destination, replace, isTest = f
     case mjs.from:
       // mjs to common js
       return Promise.all([
-        updateFileContent({
+        streamEdit({
           readableStream: createReadStream(join(sourcePath, filepath)),
           writableStream: 
             createWriteStream (

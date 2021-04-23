@@ -35,6 +35,6 @@
   ],
   "devDependencies": {
     "@types/mocha": "^8.2.1",
-    "update-file-content": "^1.8.4"
+    "stream-editor": "^1.9.0"
   }
 }
