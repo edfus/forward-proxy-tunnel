@@ -1,7 +1,5 @@
 # Forward-proxy-tunnel
 
-A simplified http[s]OverHttp proxy tunnel.
-
 [![npm](https://img.shields.io/npm/v/forward-proxy-tunnel?logo=npm)](https://www.npmjs.com/package/forward-proxy-tunnel)
 [![install size](https://packagephobia.com/badge?p=forward-proxy-tunnel)](https://packagephobia.com/result?p=forward-proxy-tunnel)
 [![CI](https://github.com/edfus/forward-proxy-tunnel/actions/workflows/node.js.yml/badge.svg?branch=master)](https://github.com/edfus/forward-proxy-tunnel/actions/workflows/node.js.yml)
