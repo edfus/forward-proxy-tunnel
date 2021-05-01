@@ -40,10 +40,30 @@ class ProxyTunnel {
     this.httpsAgent.createConnection = this.createSecureConnection.bind(this);
   }
 
-  createSecureConnection({ host: hostname, port }, cb) {
-    const host = constructHost({ hostname, port });
+  createSecureConnection(options, cb) {
+    const { host: hostname, port } = options;
+    
+    return this.createConnection(
+      options,
+      (err, socket) => {
+        if(err)
+          return cb(err);
 
-    http_connect(
+        return cb(null, tlsConnect({
+          host: hostname,
+          servername: hostname,
+          port: port,
+          socket: socket
+        }));
+      }
+    );
+  }
+
+  createConnection({ host: hostname, port }, cb) {
+    const host = constructHost({ hostname, port });
+    const onerror = err => cb(connectErrored(err));
+
+    const req = http_connect(
       this.proxy,
       {
         method: "CONNECT",
@@ -58,18 +78,14 @@ class ProxyTunnel {
     )
       .once("connect", (response, socket) => {
         if (response.statusCode === 200) {
-          return cb(null, tlsConnect({
-            host: hostname,
-            servername: hostname,
-            port: port,
-            socket: socket
-          }));
+          req.removeListener("error", onerror);
+          return cb(null, socket);
         } else {
           socket.destroy();
           return cb(connectErrored(`${response.statusCode} ${response.statusMessage}`));
         }
       })
-      .once("error", err => cb(connectErrored(err)))
+      .once("error", onerror)
       .end();
   }
 

@@ -90,10 +90,8 @@ class ProxyTunnel {
       proxyHeaders?: Headers;
       /**
        * Default:
-       * 
        * "User-Agent": `node ${process.version}`
-       * 
-       * "Accept": "*/*"
+       * "Accept": all
        */
       defaultHeaders?: Headers;
       /**
@@ -160,8 +158,15 @@ class ProxyTunnel {
   defaultHeaders: Headers;
 
   /**
+   * Create tcp connection to a given ip using http CONNECT.
+   */
+  createConnection (
+    options: { host: string, port: string },
+    callback: ((err: Error | null, socket: Socket) => void)
+  ): void
+  /**
    * The Underlying function installed as this.httpsAgent.createConnection
-   * for proxy https requests.
+   * for proxy https requests, will supply a TLSSocket.
    */
   createSecureConnection(
     options: { host: string, port: string },
