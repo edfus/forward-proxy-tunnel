@@ -21,6 +21,9 @@ const debug = {
   socketsMap: new WeakMap()
 };
 
+const colorEnabled = checkIsColorEnabled(process.stdout);
+let stripAnsiRegEx;
+
 class ProxyTunnel {
   constructor(proxy, {
     proxyHeaders = {},
@@ -185,10 +188,11 @@ class ProxyTunnel {
       const socketName = ["socket", "tlsSocket"][Number(protocol === "https")];
       
       const id_req = ++id.req;
+
       request
         .once("socket", socket => {
           if (debug.socketsMap.has(socket)) {
-            console.info(
+            info(
               "\x1b[36m%s\x1b[0m", // cyan
               `✓  ${protocol} request ${id_req} reusing ${socketName} ${debug.socketsMap.get(socket)}`
             );
@@ -196,7 +200,7 @@ class ProxyTunnel {
             const id_tcp = ++id.tcp;
 
             debug.socketsMap.set(socket, id_tcp);
-            console.info(`-  ${protocol} request ${id_req} using new ${socketName} ${id_tcp}`);
+            info(`-  ${protocol} request ${id_req} using new ${socketName} ${id_tcp}`);
             
             socket.once("close", errored => {
               const log = [];
@@ -212,11 +216,11 @@ class ProxyTunnel {
               if(errored) {
                 log.push("\x1b[31mWITH ERROR\x1b[0m"); // red
               }
-              console.info.apply(void 0, log);
+              info.apply(void 0, log);
             });
           }
         })
-        .once("close", () => console.info(`☓  ${protocol} request ${id_req} closed connection`));
+        .once("close", () => info(`☓  ${protocol} request ${id_req} closed connection`));
     }
     /**
      * DEBUG END
@@ -249,7 +253,7 @@ class ProxyTunnel {
         if(body && req.method === "GET") {
           if(!req.getHeader("Content-Length") && !req.getHeader("Transfer-Encoding")) {
             // a malformed request, but let's help with some dirty work
-            console.info(`\x1b[1m\x1b[30mForward-proxy-tunnel: Found a GET request with non-empty body.\x1b[0m`);
+            info(`\x1b[1m\x1b[30mForward-proxy-tunnel: Found a GET request with non-empty body.\x1b[0m`);
             if(body.length) {
               req.setHeader("Content-Length", body.length);
             } else {
@@ -293,4 +297,26 @@ function constructHost(uriObject) {
           ? `[${uriObject.hostname}]:${port}`
           : `${uriObject.hostname}:${port}`
   ;
+}
+
+function info (...messages) {
+  if(!colorEnabled) {
+    if(!stripAnsiRegEx) {
+      stripAnsiRegEx = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+    }
+
+    messages = messages.map(
+      m => m.replace(stripAnsiRegEx, "")
+    );
+  }
+  return console.info.apply(void 0, messages);
+}
+
+function checkIsColorEnabled(tty) {
+  return "FORCE_COLOR" in process.env
+    ? [1, 2, 3, "", true, "1", "2", "3", "true"].includes(process.env.FORCE_COLOR)
+    : !(
+      "NO_COLOR" in process.env ||
+      process.env.NODE_DISABLE_COLORS == 1 // using == by design
+    ) && tty.isTTY;
 }
