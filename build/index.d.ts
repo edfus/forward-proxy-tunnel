@@ -6,6 +6,7 @@ import {
   ClientRequest
 } from "http";
 import { Agent as HTTPS_Agent, RequestOptions, AgentOptions } from "https";
+import { Socket } from "net";
 import { TLSSocket } from "tls";
 import { Readable } from "stream";
 
@@ -103,8 +104,15 @@ declare class ProxyTunnel {
   defaultHeaders: Headers;
 
   /**
+   * Create tcp connection to a given ip using http CONNECT.
+   */
+  createConnection (
+    options: { host: string, port: string },
+    callback: ((err: Error | null, socket: Socket) => void)
+  ): void
+  /**
    * The Underlying function installed as this.httpsAgent.createConnection
-   * for proxy https requests.
+   * for proxy https requests, will supply a TLSSocket.
    */
   createSecureConnection(
     options: { host: string, port: string },
