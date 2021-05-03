@@ -68,7 +68,7 @@ if(useProxy) {
 }
 ```
 
-Check out [this](https://github.com/edfus/networking-dumpster/blob/a2ae44f3c07bc0d5e5b6d53f482589e65fa5854c/web-automation/helpers.js#L123-L222) for more examples.
+Check out [this](https://github.com/edfus/networking-dumpster/blob/49f01ea055ac50ad73791f6da1e27cd8418ea328/web-automation/helpers.js#L133-L287) for more examples.
 
 ## API
 
