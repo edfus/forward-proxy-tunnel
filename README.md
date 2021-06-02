@@ -187,6 +187,6 @@ class ProxyTunnel {
 With mocha installed globally, just run `npm test`.
 
 Notes:
-- Tests are not included in npm package, so manual clone is required.
+- Tests are not included in npm package, so a manual clone is required.
 - Tests depending on external services are disabled for stability reasons, re-enable them if you want.
 - See <https://github.com/edfus/forward-proxy-tunnel/blob/master/test/test.mjs> for more details.
